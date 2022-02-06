@@ -15,6 +15,7 @@ import com.acmerobotics.roadrunner.profile.MotionState;
 import com.acmerobotics.roadrunner.trajectory.Trajectory;
 import com.acmerobotics.roadrunner.trajectory.TrajectoryMarker;
 import com.acmerobotics.roadrunner.util.NanoClock;
+import com.amarcolini.joos.command.CommandScheduler;
 
 import org.firstinspires.ftc.teamcode.trajectorysequence.sequencesegment.SequenceSegment;
 import org.firstinspires.ftc.teamcode.trajectorysequence.sequencesegment.TrajectorySegment;
@@ -81,7 +82,7 @@ public class TrajectorySequenceRunner {
         Pose2d targetPose = null;
         DriveSignal driveSignal = null;
 
-        TelemetryPacket packet = new TelemetryPacket();
+        TelemetryPacket packet = CommandScheduler.getPacket();
         Canvas fieldOverlay = packet.fieldOverlay();
 
         SequenceSegment currentSegment = null;
@@ -194,7 +195,7 @@ public class TrajectorySequenceRunner {
 
         draw(fieldOverlay, currentTrajectorySequence, currentSegment, targetPose, poseEstimate);
 
-        dashboard.sendTelemetryPacket(packet);
+//        dashboard.sendTelemetryPacket(packet);
 
         return driveSignal;
     }

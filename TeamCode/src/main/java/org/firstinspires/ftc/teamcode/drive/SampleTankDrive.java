@@ -6,6 +6,7 @@ import com.acmerobotics.dashboard.config.Config;
 import com.acmerobotics.roadrunner.control.PIDCoefficients;
 import com.acmerobotics.roadrunner.drive.DriveSignal;
 import com.acmerobotics.roadrunner.drive.TankDrive;
+import com.acmerobotics.roadrunner.followers.RamseteFollower;
 import com.acmerobotics.roadrunner.followers.TankPIDVAFollower;
 import com.acmerobotics.roadrunner.followers.TrajectoryFollower;
 import com.acmerobotics.roadrunner.geometry.Pose2d;
@@ -17,10 +18,13 @@ import com.acmerobotics.roadrunner.trajectory.constraints.ProfileAccelerationCon
 import com.acmerobotics.roadrunner.trajectory.constraints.TankVelocityConstraint;
 import com.acmerobotics.roadrunner.trajectory.constraints.TrajectoryAccelerationConstraint;
 import com.acmerobotics.roadrunner.trajectory.constraints.TrajectoryVelocityConstraint;
+import com.acmerobotics.roadrunner.util.Angle;
+import com.amarcolini.joos.command.CommandScheduler;
 import com.qualcomm.hardware.bosch.BNO055IMU;
 import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
@@ -51,9 +55,11 @@ import static org.firstinspires.ftc.teamcode.drive.DriveConstants.kV;
  */
 @Config
 public class SampleTankDrive extends TankDrive {
-    public static PIDCoefficients AXIAL_PID = new PIDCoefficients(0, 0, 0);
-    public static PIDCoefficients CROSS_TRACK_PID = new PIDCoefficients(0, 0, 0);
-    public static PIDCoefficients HEADING_PID = new PIDCoefficients(0, 0, 0);
+//    public static PIDCoefficients AXIAL_PID = new PIDCoefficients(0, 0, 0);
+//    public static PIDCoefficients CROSS_TRACK_PID = new PIDCoefficients(0, 0, 0);
+    public static PIDCoefficients HEADING_PID = new PIDCoefficients(10, 0, 0.1);
+    public static double b = 0.02;
+    public static double zeta = 0.65;
 
     public static double VX_WEIGHT = 1;
     public static double OMEGA_WEIGHT = 1;
@@ -66,6 +72,8 @@ public class SampleTankDrive extends TankDrive {
     private TrajectoryFollower follower;
 
     private List<DcMotorEx> motors, leftMotors, rightMotors;
+    private DcMotorEx leftMain;
+    private DcMotorEx rightMain;
     private BNO055IMU imu;
 
     private VoltageSensor batteryVoltageSensor;
@@ -73,8 +81,8 @@ public class SampleTankDrive extends TankDrive {
     public SampleTankDrive(HardwareMap hardwareMap) {
         super(kV, kA, kStatic, TRACK_WIDTH);
 
-        follower = new TankPIDVAFollower(AXIAL_PID, CROSS_TRACK_PID,
-                new Pose2d(0.5, 0.5, Math.toRadians(5.0)), 0.5);
+        follower = new RamseteFollower(b, zeta,
+                new Pose2d(0.5, 0.5, Math.toRadians(5.0)), 1);
 
         LynxModuleUtil.ensureMinimumFirmwareVersion(hardwareMap);
 
@@ -95,10 +103,10 @@ public class SampleTankDrive extends TankDrive {
         // BNO055IMUUtil.remapAxes(imu, AxesOrder.XYZ, AxesSigns.NPN);
 
         // add/remove motors depending on your robot (e.g., 6WD)
-        DcMotorEx leftFront = hardwareMap.get(DcMotorEx.class, "leftFront");
-        DcMotorEx leftRear = hardwareMap.get(DcMotorEx.class, "leftRear");
-        DcMotorEx rightRear = hardwareMap.get(DcMotorEx.class, "rightRear");
-        DcMotorEx rightFront = hardwareMap.get(DcMotorEx.class, "rightFront");
+        DcMotorEx leftFront = hardwareMap.get(DcMotorEx.class, "front_left");
+        DcMotorEx leftRear = hardwareMap.get(DcMotorEx.class, "back_left");
+        DcMotorEx rightRear = hardwareMap.get(DcMotorEx.class, "back_right");
+        DcMotorEx rightFront = hardwareMap.get(DcMotorEx.class, "front_right");
 
         motors = Arrays.asList(leftFront, leftRear, rightRear, rightFront);
         leftMotors = Arrays.asList(leftFront, leftRear);
@@ -121,6 +129,11 @@ public class SampleTankDrive extends TankDrive {
         }
 
         // TODO: reverse any motors using DcMotor.setDirection()
+        leftRear.setDirection(DcMotorSimple.Direction.REVERSE);
+        rightFront.setDirection(DcMotorSimple.Direction.REVERSE);
+
+        leftMain = leftFront;
+        rightMain = rightFront;
 
         // TODO: if desired, use setLocalizer() to change the localization method
         // for instance, setLocalizer(new ThreeTrackingWheelLocalizer(...));
@@ -146,6 +159,10 @@ public class SampleTankDrive extends TankDrive {
                 VEL_CONSTRAINT, accelConstraint,
                 MAX_ANG_VEL, MAX_ANG_ACCEL
         );
+    }
+
+    public TrajectorySequenceBuilder trajectorySequenceBuilder() {
+        return trajectorySequenceBuilder(getPoseEstimate());
     }
 
     public void turnAsync(double angle) {
@@ -183,6 +200,11 @@ public class SampleTankDrive extends TankDrive {
         waitForIdle();
     }
 
+    public void turnTo(double heading) {
+        final double angle = Angle.normDelta(heading) - Angle.normDelta(getPoseEstimate().getHeading());
+        followTrajectorySequence(trajectorySequenceBuilder().turn(angle).build());
+    }
+
     public Pose2d getLastError() {
         return trajectorySequenceRunner.getLastPoseError();
     }
@@ -195,8 +217,10 @@ public class SampleTankDrive extends TankDrive {
     }
 
     public void waitForIdle() {
-        while (!Thread.currentThread().isInterrupted() && isBusy())
+        while (!Thread.currentThread().isInterrupted() && isBusy()) {
             update();
+            CommandScheduler.sendPacket();
+        }
     }
 
     public boolean isBusy() {
@@ -246,25 +270,11 @@ public class SampleTankDrive extends TankDrive {
     @NonNull
     @Override
     public List<Double> getWheelPositions() {
-        double leftSum = 0, rightSum = 0;
-        for (DcMotorEx leftMotor : leftMotors) {
-            leftSum += encoderTicksToInches(leftMotor.getCurrentPosition());
-        }
-        for (DcMotorEx rightMotor : rightMotors) {
-            rightSum += encoderTicksToInches(rightMotor.getCurrentPosition());
-        }
-        return Arrays.asList(leftSum / leftMotors.size(), rightSum / rightMotors.size());
+        return Arrays.asList(encoderTicksToInches(leftMain.getCurrentPosition()), encoderTicksToInches(rightMain.getCurrentPosition()));
     }
 
     public List<Double> getWheelVelocities() {
-        double leftSum = 0, rightSum = 0;
-        for (DcMotorEx leftMotor : leftMotors) {
-            leftSum += encoderTicksToInches(leftMotor.getVelocity());
-        }
-        for (DcMotorEx rightMotor : rightMotors) {
-            rightSum += encoderTicksToInches(rightMotor.getVelocity());
-        }
-        return Arrays.asList(leftSum / leftMotors.size(), rightSum / rightMotors.size());
+        return Arrays.asList(encoderTicksToInches(leftMain.getVelocity()), encoderTicksToInches(rightMain.getVelocity()));
     }
 
     @Override
@@ -307,7 +317,7 @@ public class SampleTankDrive extends TankDrive {
         // expected). This bug does NOT affect orientation.
         //
         // See https://github.com/FIRST-Tech-Challenge/FtcRobotController/issues/251 for details.
-        return (double) -imu.getAngularVelocity().xRotationRate;
+        return (double) imu.getAngularVelocity().yRotationRate;
     }
 
     public static TrajectoryVelocityConstraint getVelocityConstraint(double maxVel, double maxAngularVel, double trackWidth) {
