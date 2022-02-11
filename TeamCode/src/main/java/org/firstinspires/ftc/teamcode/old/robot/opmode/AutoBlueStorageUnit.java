@@ -53,7 +53,7 @@ public class AutoBlueStorageUnit extends LinearOpMode {
             }
             case THREE: {
                 position = 3;
-                distance = 6.0;
+                distance = 4.0;
                 break;
             }
         }

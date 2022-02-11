@@ -7,7 +7,6 @@ import com.acmerobotics.roadrunner.geometry.Pose2d;
 import com.amarcolini.joos.command.Command;
 import com.amarcolini.joos.command.Component;
 import com.amarcolini.joos.command.Robot;
-import com.amarcolini.joos.command.WaitCommand;
 import com.amarcolini.joos.hardware.Imu;
 import com.amarcolini.joos.hardware.Motor;
 import com.amarcolini.joos.hardware.MotorGroup;
@@ -28,6 +27,7 @@ public class FedEx extends Robot {
     public final Spinner spinner;
     public final Intake intake;
     public final Conveyor conveyor;
+    private DcMotorEx conveyorMotor;
     public final Bucket bucket;
     public final SampleTankDrive drive;
     public final Camera camera;
@@ -35,7 +35,7 @@ public class FedEx extends Robot {
     public final MotorGroup right;
     public final Imu imu;
     private boolean reversed = false;
-    private FedEx fedEx;
+    public static double freightAmps = 1.3;
 
     public FedEx(@NonNull OpMode opMode) {
         super(opMode);
@@ -60,7 +60,8 @@ public class FedEx extends Robot {
 
         spinner = new Spinner(hMap.get(DcMotor.class, "spinner"));
         intake = new Intake(new Motor(hMap, "intake", 1620));
-        conveyor = new Conveyor(new Motor(hMap, "conveyor", 1620));
+        conveyorMotor = hMap.get(DcMotorEx.class, "conveyor");
+        conveyor = new Conveyor(new Motor(conveyorMotor, 1620));
         camera = new Camera(hMap, "webcam");
 
         register(lift, bucket, spinner, intake, conveyor, gamepad, Component.of(drive::update));
@@ -78,6 +79,29 @@ public class FedEx extends Robot {
             ));
         }).runUntil(false));
 
+        AtomicBoolean hasFreight = new AtomicBoolean(false);
+        AtomicInteger state = new AtomicInteger();
+        schedule(Command.of(() -> {
+            final double amps = conveyorMotor.getCurrent(CurrentUnit.AMPS);
+            if (amps > freightAmps) {
+                switch (state.get()) {
+                    case 0: state.set(1);
+                    break;
+                    case 2: {
+                        hasFreight.set(true);
+                        state.set(3);
+                        schedule(spinner.spinDuck());
+                    }
+                    break;
+                }
+            } else if (state.get() == 1) state.set(2);
+            if (conveyorMotor.getPower() == 0) state.set(0);
+            getPacket().put("current", amps);
+            getPacket().put("state", state.get());
+            telemetry.addData("reversed", reversed);
+            telemetry.addLine(hasFreight.get() ? "YOU'VE GOT FREIGHT!" : "You do not have freight.");
+        }).runUntil(false));
+
         map(() -> gamepad.p1.a.justActivated() && !(intake.isActive() || conveyor.isActive()), Command.select(() -> {
             int newLevel = lift.getLevel() + 1;
             if (newLevel > 3) newLevel = 1;
@@ -87,12 +111,15 @@ public class FedEx extends Robot {
 
             return lift.setLevel(newLevel);
         }).requires(lift));
-        map(() -> gamepad.p1.b.justActivated() && requiring(lift) == null, bucket::toggle);
+        map(() -> gamepad.p1.b.justActivated() && requiring(lift) == null, () -> {
+            bucket.toggle();
+            if (bucket.isOpen()) hasFreight.set(false);
+        });
         map(() -> gamepad.p1.x.justActivated() && lift.getLevel() == 1, Command.of(() -> {
             conveyor.toggle();
             intake.toggle();
         }).requires(intake, conveyor));
-        map(gamepad.p1.y::justActivated, spinner::toggle);
+        map(gamepad.p1.y::justActivated, spinner.spinDuck());
         map(gamepad.p1.left_bumper::justActivated, Command.of(() -> {
             intake.reverse();
             conveyor.reverse();
@@ -110,7 +137,7 @@ public class FedEx extends Robot {
 
     @Override
     public void init() {
-
+        if (isInTeleOp) initTeleOp();
     }
 
     @Override

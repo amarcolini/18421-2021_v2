@@ -1,12 +1,18 @@
 package org.firstinspires.ftc.teamcode.drive.opmode;
 
+import static org.firstinspires.ftc.teamcode.drive.SampleTankDrive.AXIAL_PID;
+import static org.firstinspires.ftc.teamcode.drive.SampleTankDrive.CROSS_TRACK_PID;
+import static org.firstinspires.ftc.teamcode.drive.SampleTankDrive.HEADING_PID;
+
 import com.acmerobotics.dashboard.config.Config;
+import com.acmerobotics.roadrunner.followers.TankPIDVAFollower;
 import com.acmerobotics.roadrunner.geometry.Pose2d;
 import com.acmerobotics.roadrunner.trajectory.Trajectory;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
 import org.firstinspires.ftc.teamcode.drive.SampleTankDrive;
+import org.firstinspires.ftc.teamcode.trajectorysequence.TrajectorySequenceRunner;
 
 /*
  * Op mode for preliminary tuning of the follower PID coefficients (located in the drive base
@@ -46,7 +52,13 @@ public class BackAndForth extends LinearOpMode {
 
         while (opModeIsActive() && !isStopRequested()) {
             drive.followTrajectory(trajectoryForward);
+//            drive.follower = new TankPIDVAFollower(AXIAL_PID, CROSS_TRACK_PID,
+//                    new Pose2d(0.5, 0.5, Math.toRadians(5.0)), 0.5);
+//            drive.trajectorySequenceRunner = new TrajectorySequenceRunner(drive.follower, HEADING_PID);
             drive.followTrajectory(trajectoryBackward);
+//            drive.follower = new TankPIDVAFollower(AXIAL_PID, CROSS_TRACK_PID,
+//                    new Pose2d(0.5, 0.5, Math.toRadians(5.0)), 0.5);
+//            drive.trajectorySequenceRunner = new TrajectorySequenceRunner(drive.follower, HEADING_PID);
         }
     }
 }

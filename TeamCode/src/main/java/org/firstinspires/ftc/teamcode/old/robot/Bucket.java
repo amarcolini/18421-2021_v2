@@ -19,6 +19,10 @@ public class Bucket implements Component {
         state = 3;
     }
 
+    public boolean isOpen() {
+        return state == 3;
+    }
+
     public void sit() {
         servo.setPosition(0.2);
         lastState = state;

@@ -55,8 +55,8 @@ import static org.firstinspires.ftc.teamcode.drive.DriveConstants.kV;
  */
 @Config
 public class SampleTankDrive extends TankDrive {
-//    public static PIDCoefficients AXIAL_PID = new PIDCoefficients(0, 0, 0);
-//    public static PIDCoefficients CROSS_TRACK_PID = new PIDCoefficients(0, 0, 0);
+    public static PIDCoefficients AXIAL_PID = new PIDCoefficients(5, 0, 0.1);
+    public static PIDCoefficients CROSS_TRACK_PID = new PIDCoefficients(0.1, 0, 0);
     public static PIDCoefficients HEADING_PID = new PIDCoefficients(10, 0, 0.1);
     public static double b = 0.02;
     public static double zeta = 0.65;
@@ -64,12 +64,13 @@ public class SampleTankDrive extends TankDrive {
     public static double VX_WEIGHT = 1;
     public static double OMEGA_WEIGHT = 1;
 
-    private TrajectorySequenceRunner trajectorySequenceRunner;
+    public TrajectorySequenceRunner trajectorySequenceRunner;
+    public TrajectoryFollower follower;
 
     private static final TrajectoryVelocityConstraint VEL_CONSTRAINT = getVelocityConstraint(MAX_VEL, MAX_ANG_VEL, TRACK_WIDTH);
     private static final TrajectoryAccelerationConstraint accelConstraint = getAccelerationConstraint(MAX_ACCEL);
-
-    private TrajectoryFollower follower;
+//
+//    private TrajectoryFollower follower;
 
     private List<DcMotorEx> motors, leftMotors, rightMotors;
     private DcMotorEx leftMain;
@@ -81,8 +82,7 @@ public class SampleTankDrive extends TankDrive {
     public SampleTankDrive(HardwareMap hardwareMap) {
         super(kV, kA, kStatic, TRACK_WIDTH);
 
-        follower = new RamseteFollower(b, zeta,
-                new Pose2d(0.5, 0.5, Math.toRadians(5.0)), 1);
+        follower = new RamseteFollower(b, zeta, new Pose2d(0.5, 0.5, Math.toRadians(5)), 1);
 
         LynxModuleUtil.ensureMinimumFirmwareVersion(hardwareMap);
 
